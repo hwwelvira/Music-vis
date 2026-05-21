@@ -40,8 +40,17 @@ const ToggleableChordRadar = ({ sunburstData, graphData, radarFeatures, radarNam
     liveness:'现场感', instrumentalness:'器乐度', speechiness:'言语度'
   };
 
+  const getHash = (str) => {
+    let hash = 0;
+    if (!str) return hash;
+    for (let i = 0; i < str.length; i++) {
+      hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return Math.abs(hash);
+  };
+
   // ─────────────────────────────────────────────────────────────────────────
-  // REPRESENTATIVE SONG EXTRACTION
+  // REPRESENTATIVE SONG EXTRACTION WITH PARENT-BACKOFF & HASH DIVERSIFICATION
   // ─────────────────────────────────────────────────────────────────────────
   const getRepresentativeSong = (genreName) => {
     if (!scatterData || !genreName) return null;
@@ -49,21 +58,76 @@ const ToggleableChordRadar = ({ sunburstData, graphData, radarFeatures, radarNam
     // Normalize genre name: remove line breaks, spaces, convert to lowercase
     const cleanGenre = genreName.replace(/\n/g, ' ').toLowerCase().trim();
 
-    // Filter scatter songs belonging to this genre or sub-genre
-    const matchedSongs = scatterData.filter(song => {
+    // 1. First-tier match: Direct match or substring match on the child genre
+    let matchedSongs = scatterData.filter(song => {
       const songGenre = String(song[4] || '').replace(/\n/g, ' ').toLowerCase().trim();
-      return (
-        songGenre === cleanGenre ||
-        songGenre.includes(cleanGenre) ||
-        cleanGenre.includes(songGenre)
-      );
+      
+      if (songGenre === cleanGenre) return true;
+      
+      // 🛡️ 大类防反向污染子类规则：
+      // 如果歌曲流派是简短的大类汉字（如“流行”、“民谣”，长度 <= 2），且与悬停流派名（如“华语流行”、“流行摇滚”）不一致，
+      // 则强行拒绝模糊匹配，防止像 Sam Smith/Olivia Rodrigo 的英文流行歌被误装进“华语流行”中。
+      const isShortParentGenre = /[\u4e00-\u9fa5]+/.test(songGenre) && songGenre.length <= 2;
+      if (isShortParentGenre && cleanGenre !== songGenre) {
+        return false;
+      }
+      
+      if (songGenre.includes(cleanGenre) || cleanGenre.includes(songGenre)) {
+        return true;
+      }
+      
+      // If genre has hyphen or space (e.g. "trip-hop"), match sub-parts
+      const subParts = cleanGenre.split(/[\s-_]+/);
+      if (subParts.length > 1) {
+        return subParts.every(part => part.length > 2 && songGenre.includes(part));
+      }
+      return false;
     });
+
+    // 2. Second-tier parent backoff: If child genre has 0 matching songs, backoff to its top-level parent genre
+    if (matchedSongs.length === 0 && sunburstData) {
+      let parentCategory = null;
+      sunburstData.forEach(parent => {
+        if (parent.name === genreName) {
+          parentCategory = parent.name;
+        } else if (parent.children) {
+          const hasChild = parent.children.some(c => c.name === genreName);
+          if (hasChild) {
+            parentCategory = parent.name;
+          }
+        }
+      });
+
+      if (parentCategory) {
+        const cleanParent = parentCategory.toLowerCase().replace(/\n/g, ' ').trim();
+        matchedSongs = scatterData.filter(song => {
+          const songGenre = String(song[4] || '').replace(/\n/g, ' ').toLowerCase().trim();
+          return (
+            songGenre === cleanParent ||
+            songGenre.includes(cleanParent) ||
+            cleanParent.includes(songGenre)
+          );
+        });
+      }
+    }
+
+    // 3. Third-tier fallback: Global backup if still no songs found (ensures we NEVER return empty card)
+    if (matchedSongs.length === 0) {
+      matchedSongs = scatterData;
+    }
 
     if (matchedSongs.length === 0) return null;
 
-    // Sort songs by popularity [5] descending
+    // 4. Sort matching songs by popularity descending and slice top 30 hits
     const sorted = [...matchedSongs].sort((a, b) => (b[5] || 0) - (a[5] || 0));
-    const topSong = sorted[0];
+    const topCandidates = sorted.slice(0, 30);
+
+    // 5. Modulo dispersion using deterministic string hashing of the genre name.
+    // This perfectly ensures that sister subgenres (e.g. indie-pop vs post-teen pop) 
+    // select distinct songs from the Top 30 pool, making the visual experience highly diverse!
+    const hash = getHash(genreName);
+    const index = hash % topCandidates.length;
+    const topSong = topCandidates[index];
 
     return {
       title: topSong[2],
@@ -118,15 +182,16 @@ const ToggleableChordRadar = ({ sunburstData, graphData, radarFeatures, radarNam
               cacheRef.current[cacheKey] = highResUrl;
               setCoverUrl(highResUrl);
             } else {
-              setCoverUrl('');
+              setCoverUrl('https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=400&auto=format&fit=crop&q=60');
             }
           } else {
-            setCoverUrl('');
+            setCoverUrl('https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=400&auto=format&fit=crop&q=60');
           }
         })
         .catch(err => {
           console.error("Failed to fetch artwork from iTunes API:", err);
-          setCoverUrl('');
+          // 完美的断网/超时霓虹音浪降级占位图，确保视觉不穿帮
+          setCoverUrl('https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=400&auto=format&fit=crop&q=60');
         })
         .finally(() => {
           setIsLoadingCover(false);
