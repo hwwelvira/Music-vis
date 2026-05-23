@@ -745,7 +745,7 @@ const TimelineEvolutionCombined = ({ timelineData, wordsData, scatterData }) => 
       <div 
         style={{ 
           display: 'flex', 
-          justifyContent: 'space-between', 
+          justifyContent: 'flex-start', 
           alignItems: 'flex-start', 
           borderBottom: '1px solid rgba(145, 158, 171, 0.12)', 
           paddingBottom: '18px', 
@@ -760,17 +760,6 @@ const TimelineEvolutionCombined = ({ timelineData, wordsData, scatterData }) => 
           <p style={{ margin: '6px 0 0 0', fontSize: '13px', color: '#64748B', lineHeight: '1.5' }}>
             📈 60年流行乐演变全景：上方展现历年数十万单曲的 7 大物理声学演变曲线；下方悬挂同时代的流行词云气泡（气泡颜色代表其情感聚类归属）。滑动时间轴即可上下联动探秘。
           </p>
-        </div>
-
-        {/* 情感聚类图例 - 极简清爽的浅色胶囊 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', background: 'rgba(255, 255, 255, 0.5)', border: '1px solid rgba(145,158,171,0.15)', borderRadius: '30px', padding: '6px 14px' }}>
-          <span style={{ fontSize: '11px', color: '#919EAB', fontWeight: '800', textTransform: 'uppercase', marginRight: '4px' }}>情感聚类:</span>
-          {clusterLabels.map((item, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#475569', fontWeight: '700' }}>
-              <span style={{ display: 'inline-block', width: '9px', height: '9px', borderRadius: '50%', backgroundColor: item.color, border: '1px solid rgba(0,0,0,0.06)' }}></span>
-              <span>{item.label}</span>
-            </div>
-          ))}
         </div>
       </div>
 
@@ -793,6 +782,40 @@ const TimelineEvolutionCombined = ({ timelineData, wordsData, scatterData }) => 
           notMerge={true} 
           lazyUpdate={true} 
         />
+
+        {/* 情感聚类图例 - 极简清爽的浅色胶囊 (绝对定位悬浮在词云气泡图正下方，紧密贴合) */}
+        <div style={{ 
+          position: 'absolute', 
+          bottom: '12px', 
+          left: '50%', 
+          transform: 'translateX(-50%)', 
+          zIndex: 10,
+          display: 'flex', 
+          justifyContent: 'center',
+          pointerEvents: 'auto'
+        }}>
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '12px', 
+            flexWrap: 'wrap', 
+            background: 'rgba(255, 255, 255, 0.85)', 
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            border: '1px solid rgba(145, 158, 171, 0.2)', 
+            borderRadius: '30px', 
+            padding: '6px 18px', 
+            boxShadow: '0 4px 20px 0 rgba(145, 158, 171, 0.08)' 
+          }}>
+            <span style={{ fontSize: '11px', color: '#919EAB', fontWeight: '800', textTransform: 'uppercase', marginRight: '4px' }}>歌词情感聚类配色:</span>
+            {clusterLabels.map((item, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#475569', fontWeight: '700' }}>
+                <span style={{ display: 'inline-block', width: '9px', height: '9px', borderRadius: '50%', backgroundColor: item.color, border: '1px solid rgba(0,0,0,0.06)' }}></span>
+                <span>{item.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
