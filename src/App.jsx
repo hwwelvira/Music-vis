@@ -4,6 +4,9 @@ import ScatterBrushChart from './components/ScatterBrushChart';
 import SongTable from './components/SongTable';
 import ToggleableChordRadar from './components/ToggleableChordRadar';
 import TimelineEvolutionCombined from './components/TimelineEvolutionCombined';
+import AcousticClusterAssociation from './components/AcousticClusterAssociation';
+import InteractiveKMeansExplorer from './components/InteractiveKMeansExplorer';
+import GenreClusterRelation from './components/GenreClusterRelation';
 
 function App() {
   const [data, setData] = useState(null);
@@ -132,6 +135,27 @@ function App() {
           />
         </div>
       </div>
+      <div style={{ marginTop: '24px', marginBottom: '24px' }}>
+        <AcousticClusterAssociation 
+          scatterData={data.scatter} 
+          sunburstData={data.sunburst} 
+          brushedSongs={brushedData}
+        />
+      </div>
+
+      <div style={{ marginTop: '24px', marginBottom: '24px' }}>
+        <GenreClusterRelation 
+          scatterData={data.scatter}
+        />
+      </div>
+
+      <div style={{ marginTop: '24px', marginBottom: '24px' }}>
+        <InteractiveKMeansExplorer 
+          scatterData={data.scatter} 
+          sunburstData={data.sunburst}
+        />
+      </div>
+
       <div style={{ marginTop: '24px', marginBottom: '24px' }}>
         <TimelineEvolutionCombined 
           timelineData={data.timeline} 
