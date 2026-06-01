@@ -17,7 +17,7 @@ function App() {
   const [viewMode, setViewMode] = useState('main'); // 'main' or 'cockpit'
 
   useEffect(() => {
-    fetch('/data.json')
+    fetch('/data.json?t=' + Date.now())
       .then(res => res.json())
       .then(jsonData => {
         if (jsonData.sunburst) {
@@ -157,6 +157,7 @@ function App() {
           setBrushedData={setBrushedData}
           selectedSong={selectedSong}
           setSelectedSong={setSelectedSong}
+          genreDetails={data.genre_details}
         />
       ) : (
         /* 🌍 视图一：全局时空演变多维大盘 (原先的滚动长看板流，完全保留不影响) */

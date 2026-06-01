@@ -30,7 +30,7 @@ const CombinedSunburstRadar = ({ sunburstData, radarFeatures, indicatorNames, fe
       radius: '18%', // Smaller inner radar to leave room for labels
       indicator: indicatorNames.map(name => ({
         name: i18n[name] || name,
-        max: featureMaxes && featureMaxes[name] ? featureMaxes[name] * 1.05 : 1
+        max: featureMaxes && featureMaxes[name] ? Math.max(featureMaxes[name] * 1.25, 0.9) : 1
       })),
       splitNumber: 4,
       axisName: {

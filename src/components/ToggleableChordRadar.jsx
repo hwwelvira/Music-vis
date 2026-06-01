@@ -31,11 +31,18 @@ const ToggleableChordRadar = ({
   isVertical = false,
   viewMode = 'both',
   hoveredCategory: externalHoveredCategory,
-  setHoveredCategory: externalSetHoveredCategory
+  setHoveredCategory: externalSetHoveredCategory,
+  selectedSong = null // 接收外层单曲选中状态以实现视图冰冻
 }) => {
   const [localHoveredCategory, setLocalHoveredCategory] = useState(null);
   const hoveredCategory = externalHoveredCategory !== undefined ? externalHoveredCategory : localHoveredCategory;
   const setHoveredCategory = externalSetHoveredCategory !== undefined ? externalSetHoveredCategory : setLocalHoveredCategory;
+
+  // 完美解决原生 ECharts 事件绑定闭包陷阱的外部状态指针，确保事件触发时读取最新状态
+  const selectedSongRef = useRef(selectedSong);
+  useEffect(() => {
+    selectedSongRef.current = selectedSong;
+  }, [selectedSong]);
 
   // ECharts instance ref – for direct imperative updates during animation
   const echartsRef    = useRef(null);
@@ -332,8 +339,11 @@ const ToggleableChordRadar = ({
       color: BASE_COLORS,
       tooltip: {
         trigger: 'item',
+        appendToBody: true,
         backgroundColor: 'rgba(255,255,255,0.95)', borderColor: '#EEEEEE',
-        textStyle: { color: '#333333', fontFamily: '"Outfit","Inter",sans-serif' },
+        padding: [6, 10],
+        textStyle: { color: '#333333', fontSize: 10, fontFamily: '"Outfit","Inter",sans-serif' },
+        extraCssText: 'box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-radius: 6px;',
         position: function (point, params, dom, rect, size) {
           const viewWidth = size.viewSize[0];
           const viewHeight = size.viewSize[1];
@@ -483,6 +493,39 @@ const ToggleableChordRadar = ({
     };
   }, [hoveredCategory]);
 
+  // 终极联动方案：在 hoveredCategory 改变时，直接通过原生 API 强行派发官方的 highlight / downplay 动作
+  // 这不仅 100% 确保旭日图高亮扇区瞬间点亮，更触发了 ECharts 原生极为华丽的“扇区轻微放大与描边加粗”的物理质感，
+  // 并且通过 60ms 的轻微延时完美避开了 60FPS 的 RAF 渲染竞争冲突，体验一流！
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const ec = echartsRef.current?.getEchartsInstance?.();
+      if (!ec) return;
+
+      if (hoveredCategory) {
+        // 1. 先清除此前遗留的其它高亮状态
+        ec.dispatchAction({
+          type: 'downplay',
+          seriesIndex: [0, 2]
+        });
+        
+        // 2. 向旭日图及其文字标签强行派发 'highlight' 动作点亮该流派
+        ec.dispatchAction({
+          type: 'highlight',
+          seriesIndex: [0, 2],
+          name: hoveredCategory
+        });
+      } else {
+        // 3. 复位清空
+        ec.dispatchAction({
+          type: 'downplay',
+          seriesIndex: [0, 2]
+        });
+      }
+    }, 60);
+
+    return () => clearTimeout(timer);
+  }, [hoveredCategory]);
+
   // ─────────────────────────────────────────────────────────────────────────
   // RIGHT CHART: Standalone Radar
   // ─────────────────────────────────────────────────────────────────────────
@@ -543,7 +586,7 @@ const ToggleableChordRadar = ({
     }
 
     return {
-      tooltip: { trigger:'item', backgroundColor:'rgba(255,255,255,0.95)', borderColor:'#A8D8B9', textStyle:{color:'#333333',fontFamily:'"Outfit","Inter",sans-serif'} },
+      tooltip: { trigger:'item', appendToBody: true, padding: [6, 10], backgroundColor:'rgba(255,255,255,0.95)', borderColor:'#A8D8B9', textStyle:{color:'#333333',fontSize: 10,fontFamily:'"Outfit","Inter",sans-serif'}, extraCssText: 'box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-radius: 6px;' },
       legend: { 
         show: true, 
         top: viewMode === 'radar' ? '86%' : (isVertical ? '80%' : '75%'), 
@@ -556,7 +599,7 @@ const ToggleableChordRadar = ({
       radar: {
         center: viewMode === 'radar' ? ['50%', '48%'] : (isVertical ? ['50%', '42%'] : ['50%','46%']), 
         radius: viewMode === 'radar' ? '52%' : (isVertical ? '45%' : '60%'),
-        indicator: indicatorNames.map(n => ({ name: i18n[n] || n, max: featureMaxes?.[n] ? featureMaxes[n]*1.05 : 1 })),
+        indicator: indicatorNames.map(n => ({ name: i18n[n] || n, max: featureMaxes?.[n] ? Math.max(featureMaxes[n] * 1.25, 0.9) : 1 })),
         splitNumber: 4,
         axisName:  { color:'#555555', fontWeight:'bold', fontSize: (viewMode === 'radar' || isVertical) ? 9 : 11, borderRadius:3, padding:[2,4], backgroundColor:'rgba(255,255,255,0.85)' },
         splitArea: { areaStyle:{ color:['rgba(250,250,250,0.3)','rgba(240,240,240,0.5)','rgba(230,230,230,0.8)','rgba(168,216,185,0.2)'] } },
@@ -573,9 +616,21 @@ const ToggleableChordRadar = ({
   }, [radarFeatures, indicatorNames, featureMaxes, hoveredCategory, graphData]);
 
   const chordEvents = {
-    click:     p => { if (p.seriesType === 'sunburst' && p.data?.features) onNodeClick(p.data); },
-    mouseover: p => { if (p.seriesType === 'sunburst') { if (p.data?.features) onNodeHover(p.data); setHoveredCategory(p.name); } },
-    mouseout:  p => { if (p.seriesType === 'sunburst') setHoveredCategory(null); }
+    click:     p => { 
+      if (selectedSongRef.current) return; // 歌曲选中时冻结点击切换（使用 ref 指针完美破解 ECharts 事件绑定闭包陷阱）
+      if (p.seriesType === 'sunburst' && p.data?.features) onNodeClick(p.data); 
+    },
+    mouseover: p => { 
+      if (selectedSongRef.current) return; // 歌曲选中时彻底冰冻悬停，划入时不影响状态（使用 ref 实时最新判断）
+      if (p.seriesType === 'sunburst') { 
+        if (p.data?.features) onNodeHover(p.data); 
+        setHoveredCategory(p.name); 
+      } 
+    },
+    mouseout:  p => { 
+      if (selectedSongRef.current) return; // 歌曲选中时彻底冰冻，划出时绝不重置清空状态
+      if (p.seriesType === 'sunburst') setHoveredCategory(null); 
+    }
   };
 
   return (

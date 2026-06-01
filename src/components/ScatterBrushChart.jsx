@@ -27,19 +27,21 @@ const ScatterBrushChart = ({ data, onBrush, selectedSong, hoveredGenres }) => {
     tooltip: {
       formatter: function (param) {
         return `
-          <div style="font-weight: 600;">${param.data[2]}</div>
-          <div style="color:#666666; font-size:12px;">${param.data[3]}</div>
-          <div style="margin-top: 5px; font-size: 12px; color:#333;">
+          <div style="font-weight: 600; font-size: 11px; line-height: 1.4;">${param.data[2]}</div>
+          <div style="color:#666666; font-size: 9.5px; margin-top: 1px;">${param.data[3]}</div>
+          <div style="margin-top: 4px; font-size: 9.5px; color:#333; line-height: 1.5;">
             能量: ${param.data[0]}<br/>
             愉悦度: ${param.data[1]}<br/>
             流派: ${param.data[4]}
           </div>
         `;
       },
+      appendToBody: true,
       backgroundColor: 'rgba(255, 255, 255, 0.95)',
       borderColor: '#EEEEEE',
-      textStyle: { color: '#333333' },
-      padding: 10,
+      textStyle: { color: '#333333', fontSize: 10, fontFamily: '"Outfit", "Inter", sans-serif' },
+      padding: [6, 10],
+      extraCssText: 'box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-radius: 6px;'
     },
     brush: {
       toolbox: ['rect', 'polygon', 'keep', 'clear'], // 完美还原 4 个框选小工具
@@ -91,7 +93,7 @@ const ScatterBrushChart = ({ data, onBrush, selectedSong, hoveredGenres }) => {
     },
     yAxis: {
       type: 'value',
-      name: '愉悦度 (Valence)',
+      name: '愉悦度',
       nameLocation: 'center',
       nameGap: 24,
       nameTextStyle: { color: '#666666', fontWeight: 'bold', fontSize: 10 },
@@ -144,12 +146,29 @@ const ScatterBrushChart = ({ data, onBrush, selectedSong, hoveredGenres }) => {
             const hex = clusterColors[param.data[5] % clusterColors.length];
             const songGenre = param.data[4] ? param.data[4].trim().toLowerCase() : '';
             
+            // 提取同一属性（流派）以及同聚类（同颜色）的标识
+            const isSameGenre = hoveredGenres && hoveredGenres.length > 0 && hoveredGenres.includes(songGenre);
+            const isSameCluster = selectedSong && param.data[5] === selectedSong[5];
+            
             let alpha = 0.8;
             if (hoveredGenres && hoveredGenres.length > 0) {
-              // 旭日图 Hover 悬停联动优先级最高，高亮流派，暗化其余流派，形成粒子聚光灯特效
-              alpha = hoveredGenres.includes(songGenre) ? 0.95 : 0.08;
+              if (isSameGenre) {
+                // 1. 同一属性（流派，如垃圾摇滚）：最为突出明显！
+                alpha = 0.95;
+              } else if (isSameCluster) {
+                // 2. 同聚类（同颜色，如狂热释放）：次级高亮，稍微没那么明显！
+                alpha = 0.40;
+              } else {
+                // 3. 非同流派且非同聚类：彻底暗化成微弱背景
+                alpha = 0.05;
+              }
             } else if (selectedSong) {
-              alpha = param.data[5] === selectedSong[5] ? 0.85 : 0.05;
+              if (isSameCluster) {
+                // 若无流派高亮，只有单曲选中：同聚类显示为主要高亮
+                alpha = 0.85;
+              } else {
+                alpha = 0.05;
+              }
             }
             
             const r = parseInt(hex.slice(1, 3), 16);
@@ -164,16 +183,21 @@ const ScatterBrushChart = ({ data, onBrush, selectedSong, hoveredGenres }) => {
       // 选中的特定歌曲高亮特效点
       {
         type: 'effectScatter',
-        symbolSize: 10,
+        symbolSize: 6.5, // 优雅地由 10 缩减为 6.5，小巧精致，在两万点大盘中既清晰又绝不臃肿突兀
         data: selectedSong ? [selectedSong] : [],
         itemStyle: {
-          color: '#FF5E7E',
+          color: '#FF5E7E', // 蔷薇粉特效高亮色
           borderColor: '#FFFFFF',
-          borderWidth: 2,
-          shadowColor: 'rgba(255, 94, 126, 0.5)',
-          shadowBlur: 10
+          borderWidth: 1.2, // 微调为 1.2 像素的超细精致白包边
+          shadowColor: 'rgba(255, 94, 126, 0.35)', // 更为柔和深邃的阴影微发光
+          shadowBlur: 6
         },
-        rippleEffect: { brushType: 'stroke', scale: 3.5 },
+        rippleEffect: { 
+          brushType: 'stroke', 
+          scale: 2.2, // 波纹扩散半径限制在 2.2，提供局部而克制的高级呼吸感
+          period: 4,  // 调慢扩散周期，带来丝滑、极其宁静的深海呼吸波纹
+          number: 2   // 采用精细的双层微波纹涟漪，质感成倍增加
+        },
         zlevel: 1
       }
     ]
