@@ -77,6 +77,14 @@ const CockpitView = ({
   const [hoveredCategory, setHoveredCategory] = React.useState(null);
   const [isDetailExpanded, setIsDetailExpanded] = React.useState(true); // 控制歌曲多维悬浮窗的折叠与展开状态
 
+  // 流派专属详情悬浮窗状态与拖动平移状态
+  const [clickedGenre, setClickedGenre] = React.useState(null);
+  const [posGenre, setPosGenre] = React.useState({ x: 0, y: 0 });
+  const [isDraggingGenre, setIsDraggingGenre] = React.useState(false);
+  const draggingRefGenre = React.useRef(false);
+  const dragStartPosGenre = React.useRef({ x: 0, y: 0 });
+  const dragStartOffsetGenre = React.useRef({ x: 0, y: 0 });
+
   // 📊 对比雷达图的状态管理
   const [isCompareModalOpen, setIsCompareModalOpen] = React.useState(false);
   const [selectedCompareGenres, setSelectedCompareGenres] = React.useState([]);
@@ -372,16 +380,21 @@ const CockpitView = ({
     if (!song || !compareGenre) return false;
     
     // 支持 compareGenre 既是对象 { name, ... }，也是纯字符串
+    // 🧬 核心清洗：自动将带换行符或括号后缀的大类名字（如 "流行\nPop"）规约清洗到标准中文大类名称（"流行"），打通与歌曲及子流派的匹配通道
     const targetName = typeof compareGenre === 'string' 
-      ? compareGenre 
-      : (compareGenre.name || '');
+      ? compareGenre.split('\n')[0].split('(')[0].trim()
+      : ((compareGenre.name || '').split('\n')[0].split('(')[0].trim());
 
     if (!targetName) return false;
 
     const songGenreLower = (song[4] || '').toString().toLowerCase().trim();
     const genreNameLower = targetName.toLowerCase().trim();
     
-    const isParent = typeof compareGenre === 'object' && compareGenre.isParent;
+    const isParent = typeof compareGenre === 'object' && (
+      compareGenre.isParent || 
+      (compareGenre.children && compareGenre.children.length > 0) ||
+      compareGenresList.some(cg => cg.name === targetName && cg.isParent)
+    );
     
     if (isParent) {
       const childrenNames = compareGenresList
@@ -434,6 +447,15 @@ const CockpitView = ({
       return popB - popA;
     });
   }, [data, selectedKMeansGenres, isSongInGenre]);
+
+  // 🌊 主界面歌曲列表的数据源（叠加支持 Scatter Brush 框选与 Sunburst/Chord 点击流派双重过滤）
+  const displayedSongs = React.useMemo(() => {
+    const baseSongs = brushedData.length > 0 ? brushedData : (data.scatter || []);
+    if (clickedGenre) {
+      return baseSongs.filter(song => isSongInGenre(song, clickedGenre));
+    }
+    return baseSongs;
+  }, [brushedData, data, clickedGenre, isSongInGenre]);
 
   const getCompareRadarOption = () => {
     if (selectedCompareGenres.length < 2) return {};
@@ -939,13 +961,7 @@ const CockpitView = ({
     e.preventDefault();
   }, [pos, handleMouseMove, handleMouseUp]);
 
-  // 流派专属详情悬浮窗状态与拖动平移状态
-  const [clickedGenre, setClickedGenre] = React.useState(null);
-  const [posGenre, setPosGenre] = React.useState({ x: 0, y: 0 });
-  const [isDraggingGenre, setIsDraggingGenre] = React.useState(false);
-  const draggingRefGenre = React.useRef(false);
-  const dragStartPosGenre = React.useRef({ x: 0, y: 0 });
-  const dragStartOffsetGenre = React.useRef({ x: 0, y: 0 });
+
 
   const handleMouseMoveGenre = React.useCallback((e) => {
     if (!draggingRefGenre.current) return;
@@ -1334,8 +1350,30 @@ const CockpitView = ({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', borderBottom: '1px solid rgba(145,158,171,0.1)', paddingBottom: '10px', marginBottom: '8px', minHeight: '32px', overflow: 'hidden' }}>
-          <h3 style={{ margin: 0, fontSize: '11.5px', color: '#1E293B', fontWeight: '800', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 1 }}>
-            📋 歌曲列表 ({brushedData.length > 0 ? brushedData.length : data.scatter.length} 首)
+          <h3 style={{ margin: 0, fontSize: '11.5px', color: '#1E293B', fontWeight: '800', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 1, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+            <span>📋 歌曲列表</span>
+            {clickedGenre && (() => {
+              const showName = clickedGenre.name.split('\n')[0].trim();
+              return (
+                <span 
+                  style={{ 
+                    fontSize: '8px', 
+                    color: '#B088F5', 
+                    background: 'rgba(176, 136, 245, 0.1)', 
+                    padding: '2px 6px', 
+                    borderRadius: '4px',
+                    fontWeight: '800',
+                    maxWidth: '80px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}
+                  title={`当前筛选流派: ${showName}`}
+                >
+                  {showName}
+                </span>
+              );
+            })()}
           </h3>
           {selectedSong && !isDetailExpanded && (
             <button
@@ -1371,7 +1409,7 @@ const CockpitView = ({
 
         <div style={{ flexGrow: 1, minHeight: 0, width: '100%', position: 'relative' }}>
           <SongTable 
-            songs={brushedData.length > 0 ? brushedData : data.scatter} 
+            songs={displayedSongs} 
             selectedSong={selectedSong}
             onSongClick={(song) => setSelectedSong(song)}
             isCompact={true} // 启用精简模式，确保在窄栏中文字呼吸顺畅绝不折行拥挤！
