@@ -217,44 +217,37 @@ const CockpitView = ({
     prevClickedWordRef.current = clickedWord;
   }, [clickedWord]);
 
-
   // 🧬 计算选中歌词词频的流派与加权声学情感特征
   const wordAnalysisData = React.useMemo(() => {
     if (!clickedWord || !genreDetails) return null;
     
-    // 1. 初始化 7 大父流派的频次统计
-    const parentFreqs = {};
-    const parentNames = Array.from(new Set(compareGenresList.map(cg => cg.category)));
-    parentNames.forEach(name => {
-      parentFreqs[name] = 0;
-    });
-
+    // 1. 统计各具体子流派/叶子流派的频次统计
+    const genreFreqs = {};
     let totalFreq = 0;
 
-    // 2. 遍历所有子流派（叶子节点），将其词频累加到其所属的父流派中，避免父子双重计数
     compareGenresList.forEach(cg => {
-      if (cg.isParent) return; // 跳过父节点，只统计子节点（叶子节点）以防重复计算
+      // 如果是大类并且它拥有子流派，我们就不统计它本身（以防和子流派重复统计）
+      const hasChildren = compareGenresList.some(other => !other.isParent && other.category === cg.name);
+      if (cg.isParent && hasChildren) return;
       
       const words = genreDetails[cg.name]?.words || [];
       const found = words.find(w => w.name === clickedWord);
       if (found) {
-        if (parentFreqs[cg.category] !== undefined) {
-          parentFreqs[cg.category] += found.value;
-          totalFreq += found.value;
-        }
+        genreFreqs[cg.name] = (genreFreqs[cg.name] || 0) + found.value;
+        totalFreq += found.value;
       }
     });
 
-    // 3. 将结果转换为 ECharts 饼图/玫瑰图所需的数据格式
-    const genreDist = Object.keys(parentFreqs)
-      .map(pName => ({
-        name: pName,
-        value: parentFreqs[pName]
+    // 2. 将结果转换为 ECharts 饼图/玫瑰图所需的数据格式
+    const genreDist = Object.keys(genreFreqs)
+      .map(gName => ({
+        name: gName,
+        value: genreFreqs[gName]
       }))
       .filter(item => item.value > 0) // 只显示有频次的流派
       .sort((a, b) => b.value - a.value);
 
-    // 4. 计算声学情感维度的加权均值
+    // 3. 计算声学情感维度的加权均值
     const featuresList = [
       'danceability', 'energy', 'acousticness', 'valence', 'liveness', 'instrumentalness', 'speechiness'
     ];
@@ -265,8 +258,8 @@ const CockpitView = ({
     let weightSum = 0;
 
     genreDist.forEach(item => {
-      // 寻找对应的父流派特征
-      const matchedObj = compareGenresList.find(cg => cg.name === item.name && cg.isParent);
+      // 寻找对应的流派特征
+      const matchedObj = compareGenresList.find(cg => cg.name === item.name);
       if (matchedObj && matchedObj.features) {
         featuresList.forEach(key => {
           weightedFeatures[key] += (matchedObj.features[key] ?? 0.5) * item.value;
@@ -2128,7 +2121,7 @@ const CockpitView = ({
           >
             <div>
               <h4 style={{ margin: 0, fontSize: '11.5px', fontWeight: '800', color: '#0F172A' }}>
-                🔤 歌词词汇「{clickedWord}」流派与情感全维透视
+                🔤 歌名中词汇「{clickedWord}」流派与情感全维透视
               </h4>
               <p style={{ margin: '2px 0 0 0', fontSize: '8px', color: '#94A3B8' }}>
                 基于所含流派歌曲中词频总数 {wordAnalysisData.totalFreq} 次的加权特征映射
