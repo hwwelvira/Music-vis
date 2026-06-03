@@ -1363,10 +1363,10 @@ const CockpitView = ({
             <ScatterBrushChart 
               data={data.scatter} 
               selectedSong={selectedSong}
-              clickedGenre={clickedGenre} // 传递锁定的流派，用于在此状态下冰冻 KMeans 交互
+              clickedGenre={clickedGenre} // 传递锁定的流派，用于在此状态下高亮对应粒子
               hoveredGenres={hoveredGenres}
+              isSongInGenre={isSongInGenre}
               onBrush={(selectedIndices) => {
-                if (clickedGenre) return; // 流派已锁定时冻结框选交互
                 const selected = selectedIndices.map(i => data.scatter[i]);
                 setBrushedData(selected);
                 setSelectedSong(null);

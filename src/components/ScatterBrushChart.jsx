@@ -1,7 +1,7 @@
 import React, { useRef, useCallback, useMemo } from 'react';
 import ReactECharts from 'echarts-for-react';
 
-const ScatterBrushChart = ({ data, onBrush, selectedSong, hoveredGenres, clickedGenre = null }) => {
+const ScatterBrushChart = ({ data, onBrush, selectedSong, hoveredGenres, clickedGenre = null, isSongInGenre }) => {
   const chartRef = useRef(null);
   // 用 ref 保存最新的 props，避免事件回调中闭包过期
   const onBrushRef = useRef(onBrush);
@@ -155,23 +155,37 @@ const ScatterBrushChart = ({ data, onBrush, selectedSong, hoveredGenres, clicked
             const hex = clusterColors[param.data[5] % clusterColors.length];
             const songGenre = param.data[4] ? param.data[4].trim().toLowerCase() : '';
             
-            const isSameGenre = hoveredGenres && hoveredGenres.length > 0 && hoveredGenres.includes(songGenre);
-            const isSameCluster = selectedSong && param.data[5] === selectedSong[5];
-            
             let alpha = 0.8;
-            if (hoveredGenres && hoveredGenres.length > 0) {
-              if (isSameGenre) {
-                alpha = 0.95;
-              } else if (isSameCluster) {
-                alpha = 0.40;
-              } else {
-                alpha = 0.05;
+            
+            // 1. 如果有 clickedGenre 流派锁定，非选中流派粒子立刻进行高对比淡化
+            let isFilteredOut = false;
+            if (clickedGenre && isSongInGenre) {
+              if (!isSongInGenre(param.data, clickedGenre)) {
+                isFilteredOut = true;
               }
-            } else if (selectedSong) {
-              if (isSameCluster) {
-                alpha = 0.85;
-              } else {
-                alpha = 0.05;
+            }
+
+            if (isFilteredOut) {
+              alpha = 0.05; // 虚化底图背景
+            } else {
+              // 2. 属于当前 clickedGenre 的点（或无流派锁定时），响应悬停与选中状态的高亮
+              const isSameGenre = hoveredGenres && hoveredGenres.length > 0 && hoveredGenres.includes(songGenre);
+              const isSameCluster = selectedSong && param.data[5] === selectedSong[5];
+              
+              if (hoveredGenres && hoveredGenres.length > 0) {
+                if (isSameGenre) {
+                  alpha = 0.95;
+                } else if (isSameCluster) {
+                  alpha = 0.40;
+                } else {
+                  alpha = 0.05;
+                }
+              } else if (selectedSong) {
+                if (isSameCluster) {
+                  alpha = 0.85;
+                } else {
+                  alpha = 0.05;
+                }
               }
             }
             
@@ -205,7 +219,7 @@ const ScatterBrushChart = ({ data, onBrush, selectedSong, hoveredGenres, clicked
         zlevel: 1
       }
     ]
-  }), [data, hoveredGenres, selectedSong, clickedGenre]);
+  }), [data, hoveredGenres, selectedSong, clickedGenre, isSongInGenre]);
 
   // 使用 onEvents 绑定事件 —— echarts-for-react 的推荐方式，
   // 自动管理事件的绑定与解绑，避免手动操作实例的竞态问题。
