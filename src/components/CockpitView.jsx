@@ -1387,7 +1387,7 @@ const CockpitView = ({
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(145,158,171,0.1)', paddingBottom: '6px', marginBottom: '4px' }}>
             <h3 style={{ margin: 0, fontSize: '11.5px', color: '#1E293B', fontWeight: '800' }}>
-              🌌 歌曲KMeans聚类与框选 （能量与愉悦度）
+              🌌 歌曲情感分类与框选 （能量与愉悦度）
             </h3>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <button
@@ -2703,7 +2703,7 @@ const CockpitView = ({
             >
               <div>
                 <h2 style={{ margin: 0, fontSize: '13px', fontWeight: '900', color: '#1E293B', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  跨流派 KMeans 聚类情感分布对比
+                  跨流派情感分布对比
                 </h2>
                 <p style={{ margin: '4px 0 0 0', fontSize: '9.5px', color: '#64748B', fontWeight: 'bold' }}>
                   自主选择 2 到 4 个流派类别，展示它们在 能量vs愉悦度 双维度情感象限的散点分布对比
